@@ -1,28 +1,18 @@
 const express = require("express");
-const admin = require("firebase-admin");
-const db = require("./service-account.js")
+const destinations = require("./Data.js")
 
 const app = express();
 
 const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
-const destinations = [];
 
-app.get("/", async (req, res) => {
-  
-  await db
-    .collection("Destination")
-    .get()
-    .then((snapshot) => {
-      snapshot.forEach((doc) => {
-        destinations.push(doc.data());
-      });
-    });
+app.get("/", (req, res) => {
 
   res.status(200).send({
     status: "success",
     data: destinations,
   });
+
 });
 
 
@@ -35,6 +25,7 @@ app.get('/:place_id', (req,res) => {
     status: "success",
     data: destination
   });
+
 })
 
 app.listen(PORT, HOST,() => {
