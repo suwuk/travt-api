@@ -29,6 +29,23 @@ const getEncode = async (place_id) => {
   }
 };
 
+const getAllEncode = async () => {
+  try {
+    const place = [];
+    await db
+      .collection("place_encode")
+      .get()
+      .then((snapshot) => {
+        snapshot.forEach((doc) => {
+          place.push(doc.data());
+        });
+      });
+    return place;
+  } catch (error) {
+    console.error("Error getting documents: ", error);
+  }
+};
+
 const getIndexUser = async (user_id) => {
   let index = 0;
   let foundIndex = -1;
@@ -72,4 +89,5 @@ module.exports = {
   storeDataHistoryReview,
   historyData,
   getEncode,
+  getAllEncode,
 };
