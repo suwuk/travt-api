@@ -1,57 +1,18 @@
 const admin = require("firebase-admin");
-const loadModel = require("../services/loadModel.js");
-const {
-  prepareInputData,
-  trainModel,
-  predictRatings,
-  getTop20Recommendations,
-  recommendationDestination,
-} = require("../services/inferenceModel.js");
-const firebaseServiceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
-const jwt = require("jsonwebtoken");
+const firebaseServiceAccount = require(process.env.FIREBASE_SERVICE_ACCOUNT);
 const {
   destinations,
   getEncode,
   historyData,
-  getIndexUser,
   storeDataHistoryReview,
+  getAllEncode
 } = require("../services/Data_Connection.js");
+const { PythonShell } = require("python-shell");
 
 admin.initializeApp({
   credential: admin.credential.cert(firebaseServiceAccount),
   databaseURL: process.env.DATABASE_URL,
 });
-
-const secretKey = process.env.SECRET_KEY;
-
-const generateToken = (userId) => {
-  return jwt.sign({ userId }, secretKey, { expiresIn: "30d" });
-};
-
-const getUid = async (req, res) => {
-  const { email, password } = req.body;
-
-  try {
-    const user = await admin.auth().getUserByEmail(email);
-    const token = generateToken(user.uid);
-    res.status(200).json({ token });
-  } catch (error) {
-    res.status(400).json({ error: error.message });
-  }
-};
-
-const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers["authorization"];
-  const token = authHeader && authHeader.split(" ")[1];
-
-  if (!token) return res.sendStatus(401);
-
-  jwt.verify(token, secretKey, (err, user) => {
-    if (err) return res.sendStatus(403);
-    req.user_id = user.userId;
-    next();
-  });
-};
 
 const getAllData = async (req, res) => {
   if (destinations.length === 0) {
@@ -67,9 +28,21 @@ const getAllData = async (req, res) => {
   }
 };
 
+const getPopularDestinations = (req, res) => {
+  const popularDestination = destinations.filter(
+    (d) => d.verified && d.rating >= 4.5
+  );
+
+  res.status(200).send({
+    status: "success",
+    data: popularDestination,
+  });
+};
+
 const getDataById = async (req, res) => {
   const placeId = req.params.place_id;
-  const dataHistoryUser = await historyData(req.user_id);
+  const user_id = req.query.uid;
+  const dataHistoryUser = await historyData(user_id);
   const ratingDetail = dataHistoryUser[placeId]?.rating_user;
 
   const days = [
@@ -100,24 +73,14 @@ const getDataById = async (req, res) => {
   }
 };
 
-const getPopularDestinations = (req, res) => {
-  const popularDestination = destinations.filter(
-    (d) => d.verified && d.rating >= 4.5
-  );
-
-  res.status(200).send({
-    status: "success",
-    data: popularDestination,
-  });
-};
-
 const addHistoryReviewUser = async (req, res) => {
   try {
     const placeId = req.params.place_id;
+    const user_id = req.query.uid;
     const { rating } = req.body;
     const encodeDetail = await getEncode(placeId);
 
-    if (!placeId || !req.user_id) {
+    if (!placeId || !user_id) {
       return res.status(400).send({
         status: "error",
         message: "placeId atau user_id kosong",
@@ -143,7 +106,7 @@ const addHistoryReviewUser = async (req, res) => {
       createdAt,
     };
 
-    await storeDataHistoryReview(req.user_id, placeId, dataRiview);
+    await storeDataHistoryReview(user_id, placeId, dataRiview);
 
     res.status(200).send({
       status: "success",
@@ -159,12 +122,16 @@ const addHistoryReviewUser = async (req, res) => {
 };
 
 const getDataHistory = async (req, res) => {
+  const user_id = req.query.uid;
   try {
-    const historyUser = await historyData(req.user_id);
+    const historyUser = await historyData(user_id);
 
     res.status(200).send({
       status: "success",
-      data: historyUser,
+      data:
+        historyUser != null
+          ? historyUser
+          : "kamu belum pernah mereview tempat manapun",
     });
   } catch (error) {
     console.error("Error retrieving history data: ", error);
@@ -176,81 +143,59 @@ const getDataHistory = async (req, res) => {
 };
 
 const getRecommendationDestination = async (req, res) => {
-  const valueHistoryUser = Object.values(await historyData(req.user_id));
+  const user_id = req.query.uid;
+  const valueHistoryUser = Object.values(await historyData(user_id));
 
-  const userIdInput = new Array(valueHistoryUser.length).fill(27500);
+  const userIdInput = new Array(valueHistoryUser.length).fill(27499);
   const placeInput = valueHistoryUser.map((v) => v.placeId);
-  const ratingAllInput = valueHistoryUser.map((v) => v.rating_place);
   const categoryInput = valueHistoryUser.map((v) => v.category);
   const cityInput = valueHistoryUser.map((v) => v.city);
-  const ratingUserInput = valueHistoryUser.map((v) => v.rating_user);
+  const ratingAllInput = valueHistoryUser.map((v) => v.rating_place);
   const verifiedInput = valueHistoryUser.map((v) => v.verified);
+  const ratingUserInput = valueHistoryUser.map((v) => v.rating_user);
 
-  const model = await loadModel();
+  const encode = await getAllEncode();
+  const place_encode = encode.map((e) => e.tempatId);
+  const category_encode = encode.map((e) => e.kategori);
+  const city_encode = encode.map((e) => e.kota);
+  const rating_encode = encode.map((e) => e.penilaian);
+  const verified_encode = encode.map((e) => e.terverifikasi);
 
-  const hasil = await recommendationDestination(
-    model,
-    userIdInput,
-    placeInput,
-    ratingUserInput,
-    categoryInput,
-    cityInput,
-    ratingAllInput,
-    verifiedInput
-  );
+  let options = {
+    args: [
+      userIdInput,
+      placeInput,
+      categoryInput,
+      cityInput,
+      ratingAllInput,
+      verifiedInput,
+      ratingUserInput,
+      place_encode,
+      category_encode,
+      city_encode,
+      rating_encode,
+      verified_encode,
+    ], 
+  };
+
+  const runPythonScript = async () => {
+    try {
+      let train = await PythonShell.run("./src/server/model/trainmodel.py", options);
+      return train;
+    } catch (err) {
+      console.error("Error executing Python script:", err);
+      throw err;
+    }
+  };
+
+  let hasilData = await runPythonScript();
+  const hasil = JSON.parse(hasilData[1]); 
 
   res.status(200).send({
     status: "success",
-    data: hasil,
+    data: destinations.filter((item) => hasil.includes(item.placeId)),
   });
-  // const {
-  //   userIdTensor,
-  //   placeTensor,
-  //   ratingUserTensor,
-  //   categoryTensor,
-  //   cityTensor,
-  //   ratingAllTensor,
-  //   verifiedTensor,
-  // } = prepareInputData(
-  //   userIdInput,
-  //   placeInput,
-  //   ratingUserInput,
-  //   categoryInput,
-  //   cityInput,
-  //   ratingAllInput,
-  //   verifiedInput
-  // );
-  // // const hasil = await recommendationDestination(model, dataIndex, historyUser);
-  // await trainModel(
-  //   model,
-  //   userIdTensor,
-  //   placeTensor,
-  //   ratingUserTensor,
-  //   categoryTensor,
-  //   cityTensor,
-  //   ratingAllTensor,
-  //   verifiedTensor
-  // );
-  // // console.log(ratingAllTensor)
-  // const predRatings = await predictRatings(model);
-
-  // const rekomendasiPlaceIds = getTop20Recommendations(predRatings);
-
-  // res.status(200).send({
-  //   status: "success",
-  //   data: rekomendasiPlaceIds,
-  // });
 };
-
-// (async function () {
-//   const model = await loadModel();
-
-//   const predRatings = await predictRatings(model);
-
-//   const rekomendasiPlaceIds = getTopNRecommendations(predRatings, 10);
-
-//   console.log("Rekomendasi untuk pengguna baru:", rekomendasiPlaceIds);
-// })();
 
 module.exports = {
   getDataById,
@@ -259,6 +204,4 @@ module.exports = {
   addHistoryReviewUser,
   getDataHistory,
   getRecommendationDestination,
-  getUid,
-  authenticateToken,
 };

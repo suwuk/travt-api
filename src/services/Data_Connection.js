@@ -46,25 +46,6 @@ const getAllEncode = async () => {
   }
 };
 
-const getIndexUser = async (user_id) => {
-  let index = 0;
-  let foundIndex = -1;
-
-  try {
-    const snapshot = await db.collection("History_Review").get();
-    snapshot.forEach((doc) => {
-      if (doc.id === user_id) {
-        foundIndex = index;
-      }
-      index++;
-    });
-  } catch (error) {
-    console.error("Error getting documents: ", error);
-  }
-
-  return foundIndex;
-};
-
 const historyData = async (user_id) => {
   const history = await db.collection("History_Review").doc(user_id).get();
 
@@ -75,17 +56,23 @@ const historyData = async (user_id) => {
   }
 };
 
-async function storeDataHistoryReview(user_id, placeId, dataRiview) {
-  db.collection("History_Review")
-    .doc(user_id)
-    .update({
-      [placeId]: { ...dataRiview },
+async function storeDataHistoryReview(user_id, placeId, dataReview) {
+  const docRef = db.collection("History_Review").doc(user_id);
+  const doc = await docRef.get();
+
+  if (doc.exists) {
+    await docRef.update({
+      [placeId]: { ...dataReview },
     });
+  } else {
+    await docRef.set({
+      [placeId]: { ...dataReview },
+    });
+  }
 }
 
 module.exports = {
   destinations,
-  getIndexUser,
   storeDataHistoryReview,
   historyData,
   getEncode,
