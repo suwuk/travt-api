@@ -144,15 +144,33 @@ const getDataHistory = async (req, res) => {
 
 const getRecommendationDestination = async (req, res) => {
   const user_id = req.query.uid;
-  const valueHistoryUser = Object.values(await historyData(user_id));
 
-  const userIdInput = new Array(valueHistoryUser.length).fill(27499);
-  const placeInput = valueHistoryUser.map((v) => v.placeId);
-  const categoryInput = valueHistoryUser.map((v) => v.category);
-  const cityInput = valueHistoryUser.map((v) => v.city);
-  const ratingAllInput = valueHistoryUser.map((v) => v.rating_place);
-  const verifiedInput = valueHistoryUser.map((v) => v.verified);
-  const ratingUserInput = valueHistoryUser.map((v) => v.rating_user);
+  let userIdInput; 
+  let placeInput;
+  let categoryInput;
+  let cityInput;
+  let ratingAllInput; 
+  let verifiedInput;
+  let ratingUserInput; 
+
+  if (await historyData(user_id)){
+    const valueHistoryUser = Object.values(await historyData(user_id));
+    userIdInput = new Array(valueHistoryUser.length).fill(27499);
+    placeInput = valueHistoryUser.map((v) => v.placeId);
+    categoryInput = valueHistoryUser.map((v) => v.category);
+    cityInput = valueHistoryUser.map((v) => v.city);
+    ratingAllInput = valueHistoryUser.map((v) => v.rating_place);
+    verifiedInput = valueHistoryUser.map((v) => v.verified);
+    ratingUserInput = valueHistoryUser.map((v) => v.rating_user);
+  }else {
+    userIdInput = ""; 
+    placeInput = "";
+    categoryInput = "";
+    cityInput = "";
+    ratingAllInput = ""; 
+    verifiedInput = "";
+    ratingUserInput = ""; 
+  }
 
   const encode = await getAllEncode();
   const place_encode = encode.map((e) => e.tempatId);
