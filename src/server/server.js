@@ -8,6 +8,8 @@ const {
   addHistoryReviewUser,
   getDataHistory,
   getRecommendationDestination,
+  addFavoriteDestination,
+  getFavoriteUser,
 } = require("./handler.js");
 require("dotenv").config();
 
@@ -21,10 +23,12 @@ const HOST = process.env.HOST || "0.0.0.0";
 app.get("/destination", getAllData);
 app.get("/destination/popular", getPopularDestinations);
 app.get("/destination/:place_id", getDataById);
+app.post("/detination/:place_id/favorite", addFavoriteDestination)
 app.post("/destination/:place_id/review/create", addHistoryReviewUser);
+app.get("/favorite", getFavoriteUser)
 app.get("/review/history", getDataHistory);
 app.get("/recommendation", getRecommendationDestination);
 
 app.listen(PORT, HOST, () => {
-  console.log("Server already running on port 3000");
+  console.log(`Server already running on port ${PORT}`);
 });

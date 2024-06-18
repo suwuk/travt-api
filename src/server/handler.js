@@ -5,7 +5,9 @@ const {
   getEncode,
   historyData,
   storeDataHistoryReview,
-  getAllEncode
+  getAllEncode,
+  storeFavoritePlace,
+  favoriteUser,
 } = require("../services/Data_Connection.js");
 const { PythonShell } = require("python-shell");
 
@@ -29,9 +31,7 @@ const getAllData = async (req, res) => {
 };
 
 const getPopularDestinations = (req, res) => {
-  const popularDestination = destinations.filter(
-    (d) => d.verified && d.rating >= 4.5
-  );
+  const popularDestination = destinations.filter((d) => d.rating >= 4.5);
 
   res.status(200).send({
     status: "success",
@@ -44,6 +44,8 @@ const getDataById = async (req, res) => {
   const user_id = req.query.uid;
   const dataHistoryUser = await historyData(user_id);
   const ratingDetail = dataHistoryUser[placeId]?.rating_user;
+  const favorite_user = await favoriteUser(user_id);
+  const favorite_detail = favorite_user[placeId]?.favorite;
 
   const days = [
     "Sunday",
@@ -63,12 +65,61 @@ const getDataById = async (req, res) => {
   if (destination !== undefined) {
     res.status(200).send({
       status: "success",
-      data: { ...destination, day, rating_user: ratingDetail ?? 0 },
+      data: {
+        ...destination,
+        day,
+        rating_user: ratingDetail ?? 0,
+        favorite: favorite_detail,
+      },
     });
   } else {
     res.status(404).send({
       status: "fail",
       message: "destination tidak ditemukan",
+    });
+  }
+};
+
+const addFavoriteDestination = async (req, res) => {
+  try {
+    const placeId = req.params.place_id;
+    const user_id = req.query.uid;
+    const { favorite } = req.body;
+
+    if (!placeId || !user_id) {
+      return res.status(400).send({
+        status: "error",
+        message: "placeId atau user_id kosong",
+      });
+    }
+
+    if (!favorite) {
+      return res.status(400).send({
+        status: "error",
+        message: "pilih tempat favoritmu ya..",
+      });
+    }
+
+    const destination = destinations.filter(
+      (d) => d.placeId.toString() === placeId
+    )[0];
+
+    const data = {
+      ...destination,
+      favorite,
+    };
+
+    await storeFavoritePlace(user_id, placeId, data);
+
+    res.status(200).send({
+      status: "success",
+      message: "Berhasil Menyimpan tempat favoritmu",
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).send({
+      status: "error",
+      message: "Terjadi kesalahan pada server",
     });
   }
 };
@@ -96,6 +147,10 @@ const addHistoryReviewUser = async (req, res) => {
 
     const createdAt = new Date().toISOString();
 
+    const destination = destinations.filter(
+      (d) => d.placeId.toString() === placeId
+    )[0];
+
     const dataRiview = {
       placeId: Number(placeId),
       rating_user: rating,
@@ -104,6 +159,8 @@ const addHistoryReviewUser = async (req, res) => {
       rating_place: encodeDetail.penilaian,
       verified: encodeDetail.terverifikasi,
       createdAt,
+      name: destination.name,
+      photo: destination.photo1,
     };
 
     await storeDataHistoryReview(user_id, placeId, dataRiview);
@@ -142,18 +199,39 @@ const getDataHistory = async (req, res) => {
   }
 };
 
+const getFavoriteUser = async (req, res) => {
+  const user_id = req.query.uid;
+  try {
+    const favorite_user = await favoriteUser(user_id);
+
+    res.status(200).send({
+      status: "success",
+      data:
+        favorite_user != null
+          ? favorite_user
+          : "Kamu belum punya tempat favorite, Yuk Jelajah",
+    });
+  } catch (error) {
+    console.error("Error retrieving history data: ", error);
+    res.status(500).send({
+      status: "error",
+      message: "Internal Server Error",
+    });
+  }
+};
+
 const getRecommendationDestination = async (req, res) => {
   const user_id = req.query.uid;
 
-  let userIdInput; 
+  let userIdInput;
   let placeInput;
   let categoryInput;
   let cityInput;
-  let ratingAllInput; 
+  let ratingAllInput;
   let verifiedInput;
-  let ratingUserInput; 
+  let ratingUserInput;
 
-  if (await historyData(user_id)){
+  if (await historyData(user_id)) {
     const valueHistoryUser = Object.values(await historyData(user_id));
     userIdInput = new Array(valueHistoryUser.length).fill(27499);
     placeInput = valueHistoryUser.map((v) => v.placeId);
@@ -162,14 +240,14 @@ const getRecommendationDestination = async (req, res) => {
     ratingAllInput = valueHistoryUser.map((v) => v.rating_place);
     verifiedInput = valueHistoryUser.map((v) => v.verified);
     ratingUserInput = valueHistoryUser.map((v) => v.rating_user);
-  }else {
-    userIdInput = ""; 
+  } else {
+    userIdInput = "";
     placeInput = "";
     categoryInput = "";
     cityInput = "";
-    ratingAllInput = ""; 
+    ratingAllInput = "";
     verifiedInput = "";
-    ratingUserInput = ""; 
+    ratingUserInput = "";
   }
 
   const encode = await getAllEncode();
@@ -193,12 +271,15 @@ const getRecommendationDestination = async (req, res) => {
       city_encode,
       rating_encode,
       verified_encode,
-    ], 
+    ],
   };
 
   const runPythonScript = async () => {
     try {
-      let train = await PythonShell.run("./src/server/model/trainmodel.py", options);
+      let train = await PythonShell.run(
+        "./src/server/model/trainmodel.py",
+        options
+      );
       return train;
     } catch (err) {
       console.error("Error executing Python script:", err);
@@ -207,7 +288,7 @@ const getRecommendationDestination = async (req, res) => {
   };
 
   let hasilData = await runPythonScript();
-  const hasil = JSON.parse(hasilData[1]); 
+  const hasil = JSON.parse(hasilData[1]);
 
   res.status(200).send({
     status: "success",
@@ -222,4 +303,6 @@ module.exports = {
   addHistoryReviewUser,
   getDataHistory,
   getRecommendationDestination,
+  getFavoriteUser,
+  addFavoriteDestination,
 };

@@ -56,6 +56,31 @@ const historyData = async (user_id) => {
   }
 };
 
+const favoriteUser = async (user_id) => {
+  const history = await db.collection("favorite_place").doc(user_id).get();
+
+  if (history != null) {
+    return history.data();
+  } else {
+    console.log("Document not found");
+  }
+};
+
+async function storeFavoritePlace(user_id, placeId, data) {
+  const docRef = db.collection("favorite_place").doc(user_id);
+  const doc = await docRef.get();
+
+  if (doc.exists) {
+    await docRef.update({
+      [placeId]: { ...data },
+    });
+  } else {
+    await docRef.set({
+      [placeId]: { ...data},
+    });
+  }
+}
+
 async function storeDataHistoryReview(user_id, placeId, dataReview) {
   const docRef = db.collection("History_Review").doc(user_id);
   const doc = await docRef.get();
@@ -77,4 +102,6 @@ module.exports = {
   historyData,
   getEncode,
   getAllEncode,
+  storeFavoritePlace,
+  favoriteUser
 };
