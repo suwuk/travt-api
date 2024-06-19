@@ -18,12 +18,10 @@ COPY . .
 
 ENV TF_FORCE_GPU_ALLOW_GROWTH=true
 
-ENV PORT=5000
+ENV PORT=3000
 
 ENV HOST=0.0.0.0
 
-ENV PROJECT_ID=
-
-ENV DATABASE_URL=
+ENV DATABASE_URL=https://project_id-default-rtdb.region.firebasedatabase.app
 
 CMD ["/bin/bash", "-c", "source venv/bin/activate && npm start"]

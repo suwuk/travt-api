@@ -1,5 +1,3 @@
-const admin = require("firebase-admin");
-const firebaseServiceAccount = require(process.env.FIREBASE_SERVICE_ACCOUNT);
 const {
   destinations,
   getEncode,
@@ -8,13 +6,9 @@ const {
   getAllEncode,
   storeFavoritePlace,
   favoriteUser,
+  deleteFavorite,
 } = require("../services/Data_Connection.js");
 const { PythonShell } = require("python-shell");
-
-admin.initializeApp({
-  credential: admin.credential.cert(firebaseServiceAccount),
-  databaseURL: process.env.DATABASE_URL,
-});
 
 const getAllData = async (req, res) => {
   if (destinations.length === 0) {
@@ -124,6 +118,27 @@ const addFavoriteDestination = async (req, res) => {
   }
 };
 
+const deleteFavoriteUser = async (req, res) => {
+  const placeId = req.params.place_id;
+  const user_id = req.query.uid;
+  const { favorite } = req.body;
+
+  console.log(favorite);
+
+  if (!favorite) {
+    await deleteFavorite(user_id, placeId);
+    res.status(200).send({
+      status: "success",
+      message: "Berhasil menghapus favorite",
+    });
+  } else {
+    res.status(400).send({
+      status: "fail",
+      message: "gagal menghapus favorite, pastikan kamu menghapus dengan benar",
+    });
+  }
+};
+
 const addHistoryReviewUser = async (req, res) => {
   try {
     const placeId = req.params.place_id;
@@ -178,27 +193,6 @@ const addHistoryReviewUser = async (req, res) => {
   }
 };
 
-const getDataHistory = async (req, res) => {
-  const user_id = req.query.uid;
-  try {
-    const historyUser = await historyData(user_id);
-
-    res.status(200).send({
-      status: "success",
-      data:
-        historyUser != null
-          ? historyUser
-          : "kamu belum pernah mereview tempat manapun",
-    });
-  } catch (error) {
-    console.error("Error retrieving history data: ", error);
-    res.status(500).send({
-      status: "error",
-      message: "Internal Server Error",
-    });
-  }
-};
-
 const getFavoriteUser = async (req, res) => {
   const user_id = req.query.uid;
   try {
@@ -210,6 +204,27 @@ const getFavoriteUser = async (req, res) => {
         favorite_user != null
           ? favorite_user
           : "Kamu belum punya tempat favorite, Yuk Jelajah",
+    });
+  } catch (error) {
+    console.error("Error retrieving history data: ", error);
+    res.status(500).send({
+      status: "error",
+      message: "Internal Server Error",
+    });
+  }
+};
+
+const getDataHistory = async (req, res) => {
+  const user_id = req.query.uid;
+  try {
+    const historyUser = await historyData(user_id);
+
+    res.status(200).send({
+      status: "success",
+      data:
+        historyUser != null
+          ? historyUser
+          : "kamu belum pernah mereview tempat manapun",
     });
   } catch (error) {
     console.error("Error retrieving history data: ", error);
@@ -297,12 +312,13 @@ const getRecommendationDestination = async (req, res) => {
 };
 
 module.exports = {
-  getDataById,
   getAllData,
   getPopularDestinations,
+  getDataById,
+  addFavoriteDestination,
+  deleteFavoriteUser,
   addHistoryReviewUser,
+  getFavoriteUser,
   getDataHistory,
   getRecommendationDestination,
-  getFavoriteUser,
-  addFavoriteDestination,
 };
