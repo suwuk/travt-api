@@ -18,7 +18,6 @@
     <a href="#about-the-project">About The Project</a>
     <ul>
       <li><a href="#built-with">Built With</a></li>
-      <li><a href="#application-flow">Application Flow</a></li>
       <li><a href="#cicd-environment">CI/CD Environment</a></li>
     </ul>
   </li>
@@ -47,9 +46,6 @@ This repository contains Travt's back-end services, which include the necessary 
 - **CI**: Continuous Integration with [Cloud Build](https://cloud.google.com/build)
 - **Docker**: Containerization with [Docker](https://www.docker.com)
 - **Firebase**: For Authentication, Realtime database, Firestore database, and Storage [Firebase](https://firebase.google.com/docs?hl=id)
-
-### Application Flow
-![Application Flow](images/application-flow.png)
 
 ### CI/CD Environment
 ![CICD Environment](images/cloud-architecture.png)
